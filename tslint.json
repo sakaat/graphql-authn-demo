@@ -1,0 +1,15 @@
+{
+    "defaultSeverity": "error",
+    "extends": [
+        "tslint:recommended",
+        "tslint-microsoft-contrib/recommended"
+    ],
+    "jsRules": {},
+    "rules": {
+        "no-backbone-get-set-outside-model": false,
+        "no-console": false,
+        "object-literal-sort-keys": false,
+        "variable-name": false
+    },
+    "rulesDirectory": []
+}

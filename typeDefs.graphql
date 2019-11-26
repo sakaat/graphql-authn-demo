@@ -1,0 +1,21 @@
+type User {
+    id: ID!
+    company: String!
+    code: Int!
+    name: String!
+    email: String!
+    dept: Int!
+    belongs: Dept!
+}
+
+type Dept {
+    id: ID!
+    code: Int!
+    name: String!
+    members: [User!]!
+}
+
+type Query {
+    allUsers(code: Int): [User!]
+    allDepts(code: Int): [Dept!]
+}
