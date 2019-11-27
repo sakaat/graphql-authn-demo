@@ -1,5 +1,6 @@
 import { ExpressOIDC } from "@okta/oidc-middleware";
 import apollo = require("apollo-server-express");
+import bcrypt = require("bcryptjs");
 import cors = require("cors");
 import express = require("express");
 import session = require("express-session");
@@ -9,6 +10,8 @@ import expressPlayground from "graphql-playground-middleware-express";
 import { createComplexityLimitRule } from "graphql-validation-complexity";
 import { createServer } from "http";
 import uuidv4 = require("uuid/v4");
+
+const salt = bcrypt.genSaltSync(10);
 
 const typeDefs = fs.readFileSync("./typeDefs.graphql", "UTF-8");
 
@@ -87,7 +90,9 @@ const server = new apollo.ApolloServer({
         const accessToken = req
             ? req.headers.authorization
             : connection.context.authorization;
-        const currentUser = users.find((u) => u.token === accessToken);
+        const currentUser = users.find((u) =>
+            bcrypt.compareSync(accessToken, u.token),
+        );
         return { currentUser };
     },
 });
@@ -105,11 +110,12 @@ app.get("/signin", oidc.ensureAuthenticated(), (req: any, res) => {
         dummyCode += (Math.floor(Math.random() * 9) + 1).toString();
     }
     const dummyToken = uuidv4().replace(/-/g, "");
+    const hashedToken = bcrypt.hashSync(dummyToken, salt);
     let exists = false;
     for (const [index, user] of users.entries()) {
         if (user.id === userinfo.sub) {
             exists = true;
-            users[index].token = dummyToken;
+            users[index].token = hashedToken;
         }
     }
     if (!exists) {
@@ -120,7 +126,7 @@ app.get("/signin", oidc.ensureAuthenticated(), (req: any, res) => {
             name: userinfo.name,
             email: userinfo.preferred_username,
             dept: 3002,
-            token: dummyToken,
+            token: hashedToken,
         });
     }
     res.render("./signin", { token: dummyToken });
