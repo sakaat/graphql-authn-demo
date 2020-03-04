@@ -21,8 +21,6 @@ if (typeof process.env.OKTA_DOMAIN == "undefined") {
 
 const typeDefs = fs.readFileSync("./typeDefs.graphql", "UTF-8");
 
-const depts = [{ id: "2CiwYjCbSm2WZHkrUGN9", code: 3002, name: "二課" }];
-
 const resolvers = {
     Query: {
         allUsers: async (_parent, args, { currentUser }) => {
@@ -45,17 +43,35 @@ const resolvers = {
                 await db.release();
             }
         },
-        allDepts: (_parent, args) => {
+        allDepts: async (_parent, args) => {
+            const db = await getPostgresClient();
+            let sql = "SELECT * FROM depts";
+            let params;
             if (args.code) {
-                return depts.filter((d) => d.code === args.code);
+                sql += " WHERE code = $1";
+                params = [args.code];
             } else {
-                return depts;
+                params = [];
+            }
+            try {
+                const dept = await db.execute(sql, params);
+                return dept;
+            } finally {
+                await db.release();
             }
         },
     },
     User: {
-        belongs: (parent) => {
-            return depts.find((d) => d.code === parent.dept);
+        belongs: async (parent) => {
+            const db = await getPostgresClient();
+            const sql = "SELECT * FROM depts WHERE code = $1";
+            const params = [parent.dept];
+            try {
+                const dept = await db.execute(sql, params);
+                return dept[0];
+            } finally {
+                await db.release();
+            }
         },
     },
     Dept: {
@@ -168,7 +184,7 @@ app.get("/signin", oidc.ensureAuthenticated(), async (req: any, res) => {
             Number(dummyCode),
             userinfo.name,
             userinfo.preferred_username,
-            3002,
+            5678,
             dummyToken,
         ];
         const db = await getPostgresClient();
