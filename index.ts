@@ -9,7 +9,14 @@ import depthLimit = require("graphql-depth-limit");
 import expressPlayground from "graphql-playground-middleware-express";
 import { createComplexityLimitRule } from "graphql-validation-complexity";
 import { createServer } from "http";
-import uuidv4 = require("uuid/v4");
+import { v4 as uuidv4 } from "uuid";
+
+require("dotenv").config();
+if (typeof process.env.OKTA_DOMAIN == "undefined") {
+    console.error('Error: "OKTA_DOMAIN" is not set.');
+    console.error("Please consider adding a .env file with OKTA_DOMAIN.");
+    process.exit(1);
+}
 
 const salt = bcrypt.genSaltSync(10);
 
