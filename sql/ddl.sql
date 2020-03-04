@@ -3,8 +3,9 @@ CREATE TABLE users (
 , company varchar(3)
 , code    integer
 , name    varchar(20)
-, email   varchar(30)
+, email   varchar(40)
 , dept    integer
+, token   varchar(100)
 , CONSTRAINT users_pkey PRIMARY KEY(id)
 );
 

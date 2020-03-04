@@ -1,6 +1,5 @@
 import { ExpressOIDC } from "@okta/oidc-middleware";
 import apollo = require("apollo-server-express");
-import bcrypt = require("bcryptjs");
 import cors = require("cors");
 import express = require("express");
 import session = require("express-session");
@@ -9,8 +8,9 @@ import depthLimit = require("graphql-depth-limit");
 import expressPlayground from "graphql-playground-middleware-express";
 import { createComplexityLimitRule } from "graphql-validation-complexity";
 import { createServer } from "http";
-import pg = require("pg");
 import { v4 as uuidv4 } from "uuid";
+
+const { getPostgresClient } = require("./postgres");
 
 require("dotenv").config();
 if (typeof process.env.OKTA_DOMAIN == "undefined") {
@@ -19,31 +19,30 @@ if (typeof process.env.OKTA_DOMAIN == "undefined") {
     process.exit(1);
 }
 
-const pool = new pg.Pool({
-    database: process.env.POSTGRES_DB,
-    user: process.env.POSTGRES_USER,
-    password: process.env.POSTGRES_PASSWORD,
-    host: process.env.POSTGRES_HOST,
-    port: parseInt(process.env.POSTGRES_PORT),
-});
-
-const salt = bcrypt.genSaltSync(10);
-
 const typeDefs = fs.readFileSync("./typeDefs.graphql", "UTF-8");
 
-const users = [];
 const depts = [{ id: "2CiwYjCbSm2WZHkrUGN9", code: 3002, name: "二課" }];
 
 const resolvers = {
     Query: {
-        allUsers: (_parent, args, { currentUser }) => {
-            if (!currentUser) {
+        allUsers: async (_parent, args, { currentUser }) => {
+            if (!currentUser[0]) {
                 throw new Error("Only an authorized user can search users.");
             }
+            const db = await getPostgresClient();
+            let sql = "SELECT * FROM users";
+            let params;
             if (args.code) {
-                return users.filter((u) => u.code === args.code);
+                sql += " WHERE code = $1";
+                params = [args.code];
             } else {
-                return users;
+                params = [];
+            }
+            try {
+                const user = await db.execute(sql, params);
+                return user;
+            } finally {
+                await db.release();
             }
         },
         allDepts: (_parent, args) => {
@@ -60,8 +59,16 @@ const resolvers = {
         },
     },
     Dept: {
-        members: (parent) => {
-            return users.filter((u) => u.dept === parent.code);
+        members: async (parent) => {
+            const db = await getPostgresClient();
+            const sql = "SELECT * FROM users WHERE dept = $1";
+            const params = [parent.code];
+            try {
+                const user = await db.execute(sql, params);
+                return user;
+            } finally {
+                await db.release();
+            }
         },
     },
 };
@@ -106,29 +113,35 @@ const server = new apollo.ApolloServer({
         const accessToken = req
             ? req.headers.authorization
             : connection.context.authorization;
-        const currentUser = users.find((u) =>
-            bcrypt.compareSync(accessToken, u.token),
-        );
+
+        const sql = "SELECT name FROM users WHERE token = $1";
+        const params = [accessToken];
+        const db = await getPostgresClient();
+        let currentUser;
+        try {
+            currentUser = await db.execute(sql, params);
+        } finally {
+            await db.release();
+        }
+        console.log(currentUser);
         return { currentUser };
     },
 });
 server.applyMiddleware({ app });
 
-app.get("/", (_req, res) => {
-    pool.connect(async (err, client) => {
-        if (err) {
-            console.log(err);
-        } else {
-            const result = await client.query(
-                "SELECT message FROM tests LIMIT 1",
-            );
-            console.log(result.rows[0].message);
-        }
-    });
+app.get("/", async (_req, res) => {
+    const sql = "SELECT message FROM tests LIMIT 1";
+    const db = await getPostgresClient();
+    try {
+        const result = await db.execute(sql);
+        console.log(result[0].message);
+    } finally {
+        await db.release();
+    }
     res.render("./index");
 });
 
-app.get("/signin", oidc.ensureAuthenticated(), (req: any, res) => {
+app.get("/signin", oidc.ensureAuthenticated(), async (req: any, res) => {
     const userinfo = req.userContext.userinfo;
     let dummyCode = "";
     for (let i = 0; i < 6; i++) {
@@ -136,24 +149,55 @@ app.get("/signin", oidc.ensureAuthenticated(), (req: any, res) => {
         dummyCode += (Math.floor(Math.random() * 9) + 1).toString();
     }
     const dummyToken = uuidv4().replace(/-/g, "");
-    const hashedToken = bcrypt.hashSync(dummyToken, salt);
-    let exists = false;
-    for (const [index, user] of users.entries()) {
-        if (user.id === userinfo.sub) {
-            exists = true;
-            users[index].token = hashedToken;
-        }
+
+    const sql = "SELECT name FROM users WHERE id = $1";
+    const params = [userinfo.sub];
+    const db = await getPostgresClient();
+    let result;
+    try {
+        result = await db.execute(sql, params);
+    } finally {
+        await db.release();
     }
-    if (!exists) {
-        users.push({
-            id: userinfo.sub,
-            company: "AAA",
-            code: Number(dummyCode),
-            name: userinfo.name,
-            email: userinfo.preferred_username,
-            dept: 3002,
-            token: hashedToken,
-        });
+
+    if (!result[0]) {
+        const sql = "INSERT INTO users VALUES ($1, $2, $3, $4, $5, $6, $7)";
+        const params = [
+            userinfo.sub,
+            "AAA",
+            Number(dummyCode),
+            userinfo.name,
+            userinfo.preferred_username,
+            3002,
+            dummyToken,
+        ];
+        const db = await getPostgresClient();
+        try {
+            await db.begin();
+            await db.execute(sql, params);
+            await db.commit();
+            console.log("Successfully inserted.");
+        } catch (e) {
+            await db.rollback();
+            throw e;
+        } finally {
+            await db.release();
+        }
+    } else {
+        const sql = "UPDATE users SET token = $1 WHERE id = $2";
+        const params = [dummyToken, userinfo.sub];
+        const db = await getPostgresClient();
+        try {
+            await db.begin();
+            await db.execute(sql, params);
+            await db.commit();
+            console.log("Successfully updated.");
+        } catch (e) {
+            await db.rollback();
+            throw e;
+        } finally {
+            await db.release();
+        }
     }
     res.render("./signin", { token: dummyToken });
 });
