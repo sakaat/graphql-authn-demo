@@ -9,6 +9,7 @@ import depthLimit = require("graphql-depth-limit");
 import expressPlayground from "graphql-playground-middleware-express";
 import { createComplexityLimitRule } from "graphql-validation-complexity";
 import { createServer } from "http";
+import pg = require("pg");
 import { v4 as uuidv4 } from "uuid";
 
 require("dotenv").config();
@@ -17,6 +18,14 @@ if (typeof process.env.OKTA_DOMAIN == "undefined") {
     console.error("Please consider adding a .env file with OKTA_DOMAIN.");
     process.exit(1);
 }
+
+const pool = new pg.Pool({
+    database: process.env.POSTGRES_DB,
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD,
+    host: process.env.POSTGRES_HOST,
+    port: parseInt(process.env.POSTGRES_PORT),
+});
 
 const salt = bcrypt.genSaltSync(10);
 
@@ -106,6 +115,16 @@ const server = new apollo.ApolloServer({
 server.applyMiddleware({ app });
 
 app.get("/", (_req, res) => {
+    pool.connect(async (err, client) => {
+        if (err) {
+            console.log(err);
+        } else {
+            const result = await client.query(
+                "SELECT message FROM tests LIMIT 1",
+            );
+            console.log(result.rows[0].message);
+        }
+    });
     res.render("./index");
 });
 
