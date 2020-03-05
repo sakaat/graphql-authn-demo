@@ -6,7 +6,7 @@
     "scripts": {
         "tslint": "npx tslint --project .",
         "nodemon": "nodemon -e js,ts,json,graphql",
-        "start": "tsc && node dist/index.js"
+        "start": "tsc && node --require dotenv/config dist/index.js"
     },
     "keywords": [],
     "author": "",

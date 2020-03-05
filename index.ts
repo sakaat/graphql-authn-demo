@@ -12,8 +12,7 @@ import { v4 as uuidv4 } from "uuid";
 
 const { getPostgresClient } = require("./postgres");
 
-require("dotenv").config();
-if (typeof process.env.OKTA_DOMAIN == "undefined") {
+if (process.env.OKTA_DOMAIN === undefined) {
     console.error('Error: "OKTA_DOMAIN" is not set.');
     console.error("Please consider adding a .env file with OKTA_DOMAIN.");
     process.exit(1);
@@ -37,8 +36,7 @@ const resolvers = {
                 params = [];
             }
             try {
-                const user = await db.execute(sql, params);
-                return user;
+                return await db.execute(sql, params);
             } finally {
                 await db.release();
             }
@@ -54,8 +52,7 @@ const resolvers = {
                 params = [];
             }
             try {
-                const dept = await db.execute(sql, params);
-                return dept;
+                return await db.execute(sql, params);
             } finally {
                 await db.release();
             }
@@ -80,8 +77,7 @@ const resolvers = {
             const sql = "SELECT * FROM users WHERE dept = $1";
             const params = [parent.code];
             try {
-                const user = await db.execute(sql, params);
-                return user;
+                return await db.execute(sql, params);
             } finally {
                 await db.release();
             }
@@ -166,14 +162,16 @@ app.get("/signin", oidc.ensureAuthenticated(), async (req: any, res) => {
     }
     const dummyToken = uuidv4().replace(/-/g, "");
 
-    const sql = "SELECT name FROM users WHERE id = $1";
-    const params = [userinfo.sub];
-    const db = await getPostgresClient();
     let result;
-    try {
-        result = await db.execute(sql, params);
-    } finally {
-        await db.release();
+    {
+        const sql = "SELECT name FROM users WHERE id = $1";
+        const params = [userinfo.sub];
+        const db = await getPostgresClient();
+        try {
+            result = await db.execute(sql, params);
+        } finally {
+            await db.release();
+        }
     }
 
     if (!result[0]) {
