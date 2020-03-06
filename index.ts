@@ -1,6 +1,7 @@
 import { ExpressOIDC } from "@okta/oidc-middleware";
 import apollo = require("apollo-server-express");
 import cors = require("cors");
+import DataLoader from "dataloader";
 import express = require("express");
 import session = require("express-session");
 import fs = require("fs");
@@ -8,6 +9,7 @@ import depthLimit = require("graphql-depth-limit");
 import expressPlayground from "graphql-playground-middleware-express";
 import { createComplexityLimitRule } from "graphql-validation-complexity";
 import { createServer } from "http";
+import * as R from "ramda";
 import { v4 as uuidv4 } from "uuid";
 
 const { getPostgresClient } = require("./postgres");
@@ -19,6 +21,21 @@ if (process.env.OKTA_DOMAIN === undefined) {
 }
 
 const typeDefs = fs.readFileSync("./typeDefs.graphql", "UTF-8");
+
+const listsDepts = async (dept) => {
+    console.log(dept);
+    const db = await getPostgresClient();
+    const sql = "SELECT * FROM depts WHERE code = any($1) ORDER BY code";
+    const params = [dept];
+    try {
+        const result = await db.execute(sql, params);
+        const groupedById = R.groupBy((list) => list.code, result);
+        const sortedByDept = R.map((id) => groupedById[id] || [], dept);
+        return sortedByDept.flat();
+    } finally {
+        await db.release();
+    }
+};
 
 const resolvers = {
     Query: {
@@ -59,16 +76,9 @@ const resolvers = {
         },
     },
     User: {
-        belongs: async (parent) => {
-            const db = await getPostgresClient();
-            const sql = "SELECT * FROM depts WHERE code = $1";
-            const params = [parent.dept];
-            try {
-                const dept = await db.execute(sql, params);
-                return dept[0];
-            } finally {
-                await db.release();
-            }
+        belongs: (parent, _args, context) => {
+            const { listLoader } = context;
+            return listLoader.load(parent.dept);
         },
     },
     Dept: {
@@ -136,7 +146,8 @@ const server = new apollo.ApolloServer({
             await db.release();
         }
         console.log(currentUser);
-        return { currentUser };
+
+        return { currentUser, listLoader: new DataLoader(listsDepts) };
     },
 });
 server.applyMiddleware({ app });
