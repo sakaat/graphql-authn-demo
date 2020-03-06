@@ -14,6 +14,7 @@
     "dependencies": {
         "apollo-server-express": "^2.11.0",
         "bcryptjs": "^2.4.3",
+        "dataloader": "^2.0.0",
         "dotenv": "^8.2.0",
         "ejs": "^3.0.1",
         "express": "^4.17.1",
@@ -23,7 +24,8 @@
         "graphql-playground-middleware-express": "^1.7.12",
         "graphql-validation-complexity": "^0.2.5",
         "pg": "^7.18.2",
-        "uuid": "^7.0.1"
+        "ramda": "^0.27.0",
+        "uuid": "^7.0.2"
     },
     "devDependencies": {
         "@okta/oidc-middleware": "^4.0.0",
