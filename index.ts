@@ -22,10 +22,25 @@ if (process.env.OKTA_DOMAIN === undefined) {
 
 const typeDefs = fs.readFileSync("./typeDefs.graphql", "UTF-8");
 
+const listsUsers = async (code) => {
+    console.log(code);
+    const db = await getPostgresClient();
+    const sql = "SELECT * FROM users WHERE dept = any($1)";
+    const params = [code];
+    try {
+        const result = await db.execute(sql, params);
+        const groupedById = R.groupBy((list) => list.dept, result);
+        const sortedByCode = R.map((id) => groupedById[id] || [], code);
+        return sortedByCode;
+    } finally {
+        await db.release();
+    }
+};
+
 const listsDepts = async (dept) => {
     console.log(dept);
     const db = await getPostgresClient();
-    const sql = "SELECT * FROM depts WHERE code = any($1) ORDER BY code";
+    const sql = "SELECT * FROM depts WHERE code = any($1)";
     const params = [dept];
     try {
         const result = await db.execute(sql, params);
@@ -77,20 +92,14 @@ const resolvers = {
     },
     User: {
         belongs: (parent, _args, context) => {
-            const { listLoader } = context;
-            return listLoader.load(parent.dept);
+            const { listLoaderDepts } = context;
+            return listLoaderDepts.load(parent.dept);
         },
     },
     Dept: {
-        members: async (parent) => {
-            const db = await getPostgresClient();
-            const sql = "SELECT * FROM users WHERE dept = $1";
-            const params = [parent.code];
-            try {
-                return await db.execute(sql, params);
-            } finally {
-                await db.release();
-            }
+        members: (parent, _args, context) => {
+            const { listLoaderUsers } = context;
+            return listLoaderUsers.load(parent.code);
         },
     },
 };
@@ -147,7 +156,11 @@ const server = new apollo.ApolloServer({
         }
         console.log(currentUser);
 
-        return { currentUser, listLoader: new DataLoader(listsDepts) };
+        return {
+            currentUser,
+            listLoaderUsers: new DataLoader(listsUsers),
+            listLoaderDepts: new DataLoader(listsDepts),
+        };
     },
 });
 server.applyMiddleware({ app });
