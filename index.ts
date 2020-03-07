@@ -12,6 +12,8 @@ import { createServer } from "http";
 import * as R from "ramda";
 import { v4 as uuidv4 } from "uuid";
 
+import router = require("./router");
+
 const { getPostgresClient } = require("./postgres");
 
 if (process.env.OKTA_DOMAIN === undefined) {
@@ -30,8 +32,7 @@ const listsUsers = async (code) => {
     try {
         const result = await db.execute(sql, params);
         const groupedById = R.groupBy((list) => list.dept, result);
-        const sortedByCode = R.map((id) => groupedById[id] || [], code);
-        return sortedByCode;
+        return R.map((id) => groupedById[id] || [], code);
     } finally {
         await db.release();
     }
@@ -165,17 +166,7 @@ const server = new apollo.ApolloServer({
 });
 server.applyMiddleware({ app });
 
-app.get("/", async (_req, res) => {
-    const sql = "SELECT message FROM tests LIMIT 1";
-    const db = await getPostgresClient();
-    try {
-        const result = await db.execute(sql);
-        console.log(result[0].message);
-    } finally {
-        await db.release();
-    }
-    res.render("./index");
-});
+app.use("/", router);
 
 app.get("/signin", oidc.ensureAuthenticated(), async (req: any, res) => {
     const userinfo = req.userContext.userinfo;

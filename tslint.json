@@ -6,8 +6,13 @@
     ],
     "jsRules": {},
     "rules": {
+        "export-name": false,
         "no-backbone-get-set-outside-model": false,
         "no-console": false,
+        "no-relative-imports": [
+            true,
+            "allow-siblings"
+        ],
         "no-var-requires": false,
         "object-literal-sort-keys": false,
         "variable-name": false
