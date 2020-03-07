@@ -17,7 +17,6 @@ const { getPostgresClient } = require("./postgres");
 
 if (process.env.OKTA_DOMAIN === undefined) {
     console.error('Error: "OKTA_DOMAIN" is not set.');
-    console.error("Please consider adding a .env file with OKTA_DOMAIN.");
     process.exit(1);
 }
 
@@ -74,7 +73,6 @@ const server = new apollo.ApolloServer({
         } finally {
             await db.release();
         }
-        console.log(currentUser);
 
         return {
             currentUser,
@@ -87,13 +85,17 @@ server.applyMiddleware({ app });
 
 app.use("/", router);
 
-app.get("/signin", oidc.ensureAuthenticated(), async (req: any, res) => {
-    const userinfo = req.userContext.userinfo;
+const generateDummyCode = (): string => {
     let dummyCode = "";
     for (let i = 0; i < 6; i++) {
-        // tslint:disable-next-line: insecure-random
         dummyCode += (Math.floor(Math.random() * 9) + 1).toString();
     }
+    return dummyCode;
+};
+
+app.get("/signin", oidc.ensureAuthenticated(), async (req: any, res) => {
+    const userinfo = req.userContext.userinfo;
+    const dummyCode = generateDummyCode();
     const dummyToken = uuidv4().replace(/-/g, "");
 
     let result;
