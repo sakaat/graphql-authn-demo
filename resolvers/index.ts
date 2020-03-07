@@ -1,4 +1,35 @@
+import * as R from "ramda";
+
 const { getPostgresClient } = require("../postgres");
+
+export const listsUsers = async (code) => {
+    console.log(code);
+    const db = await getPostgresClient();
+    const sql = "SELECT * FROM users WHERE dept = any($1)";
+    const params = [code];
+    try {
+        const result = await db.execute(sql, params);
+        const groupedById = R.groupBy((list: any) => list.dept, result);
+        return R.map((id) => groupedById[id] || [], code);
+    } finally {
+        await db.release();
+    }
+};
+
+export const listsDepts = async (dept) => {
+    console.log(dept);
+    const db = await getPostgresClient();
+    const sql = "SELECT * FROM depts WHERE code = any($1)";
+    const params = [dept];
+    try {
+        const result = await db.execute(sql, params);
+        const groupedById = R.groupBy((list: any) => list.code, result);
+        const sortedByDept = R.map((id) => groupedById[id] || [], dept);
+        return sortedByDept.flat();
+    } finally {
+        await db.release();
+    }
+};
 
 export const resolvers = {
     Query: {

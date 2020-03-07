@@ -9,7 +9,6 @@ import depthLimit = require("graphql-depth-limit");
 import expressPlayground from "graphql-playground-middleware-express";
 import { createComplexityLimitRule } from "graphql-validation-complexity";
 import { createServer } from "http";
-import * as R from "ramda";
 import { v4 as uuidv4 } from "uuid";
 
 import router = require("./router");
@@ -23,36 +22,7 @@ if (process.env.OKTA_DOMAIN === undefined) {
 }
 
 const typeDefs = fs.readFileSync("./typeDefs.graphql", "UTF-8");
-import { resolvers } from "./resolvers";
-
-const listsUsers = async (code) => {
-    console.log(code);
-    const db = await getPostgresClient();
-    const sql = "SELECT * FROM users WHERE dept = any($1)";
-    const params = [code];
-    try {
-        const result = await db.execute(sql, params);
-        const groupedById = R.groupBy((list) => list.dept, result);
-        return R.map((id) => groupedById[id] || [], code);
-    } finally {
-        await db.release();
-    }
-};
-
-const listsDepts = async (dept) => {
-    console.log(dept);
-    const db = await getPostgresClient();
-    const sql = "SELECT * FROM depts WHERE code = any($1)";
-    const params = [dept];
-    try {
-        const result = await db.execute(sql, params);
-        const groupedById = R.groupBy((list) => list.code, result);
-        const sortedByDept = R.map((id) => groupedById[id] || [], dept);
-        return sortedByDept.flat();
-    } finally {
-        await db.release();
-    }
-};
+import { listsUsers, listsDepts, resolvers } from "./resolvers";
 
 const app = express();
 app.use(cors());
