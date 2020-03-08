@@ -9,8 +9,8 @@ import depthLimit = require("graphql-depth-limit");
 import expressPlayground from "graphql-playground-middleware-express";
 import { createComplexityLimitRule } from "graphql-validation-complexity";
 import { createServer } from "http";
-import { v4 as uuidv4 } from "uuid";
 
+import { generateDummyCode, generateDummyToken } from "./lib";
 import router = require("./router");
 
 const { getPostgresClient } = require("./postgres");
@@ -21,7 +21,8 @@ if (process.env.OKTA_DOMAIN === undefined) {
 }
 
 const typeDefs = fs.readFileSync("./typeDefs.graphql", "UTF-8");
-import { listsUsers, listsDepts, resolvers } from "./resolvers";
+import { listsUsers, listsDepts } from "./lib";
+import { resolvers } from "./resolvers";
 
 const app = express();
 app.use(cors());
@@ -85,18 +86,10 @@ server.applyMiddleware({ app });
 
 app.use("/", router);
 
-const generateDummyCode = (): string => {
-    let dummyCode = "";
-    for (let i = 0; i < 6; i++) {
-        dummyCode += (Math.floor(Math.random() * 9) + 1).toString();
-    }
-    return dummyCode;
-};
-
 app.get("/signin", oidc.ensureAuthenticated(), async (req: any, res) => {
     const userinfo = req.userContext.userinfo;
     const dummyCode = generateDummyCode();
-    const dummyToken = uuidv4().replace(/-/g, "");
+    const dummyToken = generateDummyToken();
 
     let result;
     {
@@ -115,7 +108,7 @@ app.get("/signin", oidc.ensureAuthenticated(), async (req: any, res) => {
         const params = [
             userinfo.sub,
             "AAA",
-            Number(dummyCode),
+            dummyCode,
             userinfo.name,
             userinfo.preferred_username,
             5678,

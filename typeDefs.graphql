@@ -19,3 +19,7 @@ type Query {
     allUsers(code: Int): [User!]
     allDepts(code: Int): [Dept!]
 }
+
+type Mutation {
+    addFakeUsers(count: Int = 1): [User!]!
+}
