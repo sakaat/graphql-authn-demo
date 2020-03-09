@@ -12,9 +12,8 @@ const query = gql`
     {
         allDepts {
             members {
-                belongs {
-                    name
-                }
+                code
+                name
             }
         }
     }
