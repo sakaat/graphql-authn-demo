@@ -6,7 +6,12 @@ import "./index.css";
 import App from "./App";
 import * as serviceWorker from "./serviceWorker";
 
-const client = new ApolloClient({ uri: "http://localhost:5000/graphql" });
+const client = new ApolloClient({
+    uri: "http://localhost:5000/graphql",
+    headers: {
+        authorization: `${localStorage.getItem("token")}`,
+    },
+});
 
 const query = gql`
     {

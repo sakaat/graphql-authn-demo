@@ -2,11 +2,10 @@ import {} from "./index";
 const { getPostgresClient } = require("../postgres");
 
 module.exports = {
-    allUsers: async (_parent, args) => {
-        // allUsers: async (_parent, args, { currentUser }) => {
-        //     if (!currentUser[0]) {
-        //         throw new Error("Only an authorized user can search users.");
-        //     }
+    allUsers: async (_parent, args, { currentUser }) => {
+        if (!currentUser[0]) {
+            throw new Error("Only an authorized user can search users.");
+        }
         const db = await getPostgresClient();
         let sql = "SELECT * FROM users";
         let params;
